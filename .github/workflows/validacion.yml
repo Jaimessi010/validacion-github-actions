@@ -16,7 +16,13 @@ jobs:
   validacion:
     runs-on: ubuntu-latest
 
+    env:
+      PYTHONPATH: .
+
     steps:
+
+      - name: Descargar repositorio
+        uses: actions/checkout@v4
 
       # ==========================================
       # 1. DESCARGAR EL REPOSITORIO
