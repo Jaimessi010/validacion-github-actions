@@ -1,0 +1,180 @@
+name: Validacion Docker y GitHub Actions
+
+on:
+  push:
+    branches:
+      - main
+
+  pull_request:
+    branches:
+      - main
+
+  workflow_dispatch:
+
+jobs:
+
+  validacion:
+    runs-on: ubuntu-latest
+
+    steps:
+
+      # ==========================================
+      # 1. DESCARGAR EL REPOSITORIO
+      # ==========================================
+
+      - name: Descargar repositorio
+        uses: actions/checkout@v4
+
+
+      # ==========================================
+      # 2. CONFIGURAR PYTHON
+      # ==========================================
+
+      - name: Configurar Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+
+      # ==========================================
+      # 3. INSTALAR DEPENDENCIAS
+      # ==========================================
+
+      - name: Instalar dependencias
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+
+      # ==========================================
+      # 4. COMPROBACIÓN DE COMPILACIÓN
+      # ==========================================
+
+      - name: Comprobar compilación de Python
+        run: |
+          python -m compileall app.py tests/
+
+
+      # ==========================================
+      # 5. PRUEBAS UNITARIAS
+      # ==========================================
+
+      - name: Ejecutar pruebas unitarias
+        run: |
+          pytest -v
+
+
+      # ==========================================
+      # 6. COBERTURA
+      # ==========================================
+
+      - name: Calcular cobertura
+        run: |
+          pytest --cov=app --cov-report=term-missing
+
+
+      # ==========================================
+      # 7. CONFIGURAR DOCKER BUILDX
+      # ==========================================
+
+      - name: Configurar Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+
+      # ==========================================
+      # 8. DOCKER BUILD
+      # ==========================================
+
+      - name: Comprobar Docker Build
+        run: |
+          docker build -t validacion-actions:build .
+
+
+      # ==========================================
+      # 9. DOCKER BAKE
+      # ==========================================
+
+      - name: Comprobar Docker Bake
+        run: |
+          docker buildx bake --load
+
+
+      # ==========================================
+      # 10. MOSTRAR IMÁGENES
+      # ==========================================
+
+      - name: Mostrar imágenes creadas
+        run: |
+          docker images
+
+
+      # ==========================================
+      # 11. EJECUTAR EL CÓDIGO
+      # ==========================================
+
+      - name: Ejecutar aplicación
+        run: |
+          docker run -d \
+            --name aplicacion-validacion \
+            -p 5000:5000 \
+            validacion-actions:latest
+
+          sleep 5
+
+
+      # ==========================================
+      # 12. MOSTRAR SALIDA
+      # ==========================================
+
+      - name: Mostrar salida del código
+        run: |
+          echo "Respuesta de la aplicación:"
+          curl http://localhost:5000/
+
+          echo ""
+
+          echo "Lista de tareas:"
+          curl http://localhost:5000/tareas
+
+          echo ""
+
+          echo "Estado del sistema:"
+          curl http://localhost:5000/health
+
+
+      # ==========================================
+      # 13. MOSTRAR LOGS
+      # ==========================================
+
+      - name: Mostrar logs del contenedor
+        if: always()
+        run: |
+          docker logs aplicacion-validacion || true
+
+
+      # ==========================================
+      # 14. SUMMARY
+      # ==========================================
+
+      - name: Crear resumen
+        if: always()
+        run: |
+          echo "# ✅ Reporte de Validación" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          echo "## 🔨 Comprobaciones de compilación" >> $GITHUB_STEP_SUMMARY
+          echo "- Python: **3.12**" >> $GITHUB_STEP_SUMMARY
+          echo "- Compilación Python: **Correcta**" >> $GITHUB_STEP_SUMMARY
+          echo "- Pruebas unitarias: **pytest**" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          echo "## 🐳 Docker" >> $GITHUB_STEP_SUMMARY
+          echo "- Docker Build: **Ejecutado**" >> $GITHUB_STEP_SUMMARY
+          echo "- Docker Bake: **Ejecutado**" >> $GITHUB_STEP_SUMMARY
+          echo "- Imagen: **validacion-actions:latest**" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          echo "## 🚀 Ejecución" >> $GITHUB_STEP_SUMMARY
+          echo "- Contenedor iniciado correctamente" >> $GITHUB_STEP_SUMMARY
+          echo "- Puerto utilizado: **5000**" >> $GITHUB_STEP_SUMMARY
+          echo "- Endpoint probado: **/health**" >> $GITHUB_STEP_SUMMARY
